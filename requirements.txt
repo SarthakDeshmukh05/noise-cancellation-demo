@@ -1,4 +1,6 @@
 streamlit
 numpy
+pandas
 matplotlib
-pydub
+scipy
+ffmpeg-python
