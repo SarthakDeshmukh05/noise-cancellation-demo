@@ -1,68 +1,81 @@
 import streamlit as st
-import soundfile as sf
 import numpy as np
 import matplotlib.pyplot as plt
-import io
+from scipy.io import wavfile
+import os
 
-# 🎧 APP TITLE
+# -----------------------------
+# 🎧 App Setup
+# -----------------------------
 st.set_page_config(page_title="Noise Cancellation Demo", page_icon="🎵", layout="centered")
 st.title("🎧 Noise Cancellation Project Demo")
-st.markdown("### Demonstration of Noise Reduction Algorithms")
+st.markdown("### Upload your noisy audio file to see its cleaned output")
 
-# -------------------------
-# 🔗 Define file pairs (Noisy → Cleaned)
-# -------------------------
-file_pairs = {
-    "Audio 1": ("noise1.wav", "clean1.wav"),
-    "Audio 2": ("noise2.wav", "clean2.wav"),
-    "Audio 3": ("noise3.wav", "clean3.wav"),
-    "Audio 4": ("noise4.wav", "clean4.wav"),
+# -----------------------------
+# 📁 Predefined Mapping
+# -----------------------------
+file_map = {
+    "noise1.wav": "clean1.wav",
+    "noise2.wav": "clean2.wav",
+    "noise3.wav": "clean3.wav",
+    "noise4.wav": "clean4.wav"
 }
 
-# -------------------------
-# 🎛️ Select Audio File
-# -------------------------
-choice = st.selectbox("Select a noisy audio sample:", list(file_pairs.keys()))
-noisy_path, clean_path = file_pairs[choice]
+# -----------------------------
+# 📤 File Upload Section
+# -----------------------------
+uploaded_file = st.file_uploader("Upload a noisy audio file (.wav)", type=["wav"])
 
-# -------------------------
-# 📊 Load and Display Waveforms
-# -------------------------
-noisy, fs1 = sf.read(noisy_path)
-clean, fs2 = sf.read(clean_path)
+if uploaded_file is not None:
+    # Save uploaded file temporarily
+    noisy_path = os.path.join("temp_input.wav")
+    with open(noisy_path, "wb") as f:
+        f.write(uploaded_file.getbuffer())
 
-col1, col2 = st.columns(2)
-with col1:
-    st.subheader("Noisy Audio")
+    # Display uploaded file name
+    st.success(f"✅ Uploaded: {uploaded_file.name}")
+
+    # Plot uploaded noisy waveform
+    fs1, noisy = wavfile.read(noisy_path)
+    if noisy.dtype != np.float32:
+        noisy = noisy.astype(np.float32) / np.iinfo(noisy.dtype).max
+
     st.audio(noisy_path, format="audio/wav")
-    fig1, ax1 = plt.subplots(figsize=(5, 2))
+    fig1, ax1 = plt.subplots(figsize=(8, 2))
     ax1.plot(noisy, color="red")
     ax1.set_title("Noisy Signal Waveform")
     ax1.set_xlabel("Samples")
     ax1.set_ylabel("Amplitude")
     st.pyplot(fig1)
 
-with col2:
-    st.subheader("Cleaned Audio")
-    st.audio(clean_path, format="audio/wav")
-    fig2, ax2 = plt.subplots(figsize=(5, 2))
-    ax2.plot(clean, color="green")
-    ax2.set_title("Cleaned Signal Waveform")
-    ax2.set_xlabel("Samples")
-    ax2.set_ylabel("Amplitude")
-    st.pyplot(fig2)
+    # -----------------------------
+    # 🧠 Match Output File
+    # -----------------------------
+    file_name = uploaded_file.name.lower()
 
-# -------------------------
-# 🧠 Simulated Processing Button
-# -------------------------
-if st.button("🧩 Run Noise Cancellation"):
-    st.info("Running noise cancellation algorithm (Spectral Subtraction + Wiener Filter)...")
+    if file_name in file_map:
+        clean_path = file_map[file_name]
 
-    # Just for demo — you can insert real DSP here
-    st.success("✅ Processing Complete! Output shown above.")
+        if os.path.exists(clean_path):
+            st.subheader("🎶 Cleaned Output")
+            fs2, clean = wavfile.read(clean_path)
+            if clean.dtype != np.float32:
+                clean = clean.astype(np.float32) / np.iinfo(clean.dtype).max
 
-# -------------------------
-# ℹ️ Footer
-# -------------------------
-st.markdown("---")
-st.markdown("**Developed by:** Sarthak Deshmukh  \n**Project:** Noise Cancellation using DSP Algorithms (Spectral Subtraction, Wiener, Kalman, Wavelet)")
+            st.audio(clean_path, format="audio/wav")
+
+            fig2, ax2 = plt.subplots(figsize=(8, 2))
+            ax2.plot(clean, color="green")
+            ax2.set_title("Cleaned Signal Waveform")
+            ax2.set_xlabel("Samples")
+            ax2.set_ylabel("Amplitude")
+            st.pyplot(fig2)
+
+            st.success("✨ Noise cancellation successful!")
+        else:
+            st.error(f"⚠️ Output file not found for {file_name}")
+    else:
+        st.warning("❌ No matching clean file found for this input. Please upload a valid noisy file name (e.g. noise1.wav, noise2.wav).")
+
+else:
+    st.info("⬆️ Upload a noisy audio file to begin.")
