@@ -1,46 +1,49 @@
 import streamlit as st
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.io import wavfile
+from pydub import AudioSegment
+import io
 import os
 
 # -----------------------------
-# 🎧 App Setup
+# 🎵 Streamlit Setup
 # -----------------------------
-st.set_page_config(page_title="Noise Cancellation Demo", page_icon="🎵", layout="centered")
+st.set_page_config(page_title="Noise Cancellation Demo", page_icon="🎧", layout="centered")
 st.title("🎧 Noise Cancellation Project Demo")
-st.markdown("### Upload your noisy audio file to see its cleaned output")
+st.markdown("### Upload a noisy MP3 file to see its cleaned version automatically")
 
 # -----------------------------
-# 📁 Predefined Mapping
+# 📁 Predefined Mapping (Noisy → Clean)
 # -----------------------------
 file_map = {
-    "noise1.wav": "clean1.wav",
-    "noise2.wav": "clean2.wav",
-    "noise3.wav": "clean3.wav",
-    "noise4.wav": "clean4.wav"
+    "noise1.mp3": "clean1.mp3",
+    "noise2.mp3": "clean2.mp3",
+    "noise3.mp3": "clean3.mp3",
+    "noise4.mp3": "clean4.mp3",
 }
 
 # -----------------------------
-# 📤 File Upload Section
+# 📤 Upload Section
 # -----------------------------
-uploaded_file = st.file_uploader("Upload a noisy audio file (.wav)", type=["wav"])
+uploaded_file = st.file_uploader("Upload your noisy audio file (.mp3)", type=["mp3"])
+
+def load_mp3(filepath):
+    audio = AudioSegment.from_file(filepath, format="mp3")
+    samples = np.array(audio.get_array_of_samples()).astype(np.float32)
+    samples /= np.iinfo(np.int16).max  # normalize
+    return samples, audio.frame_rate
 
 if uploaded_file is not None:
     # Save uploaded file temporarily
-    noisy_path = os.path.join("temp_input.wav")
+    noisy_path = "uploaded_input.mp3"
     with open(noisy_path, "wb") as f:
         f.write(uploaded_file.getbuffer())
 
-    # Display uploaded file name
     st.success(f"✅ Uploaded: {uploaded_file.name}")
+    st.audio(noisy_path, format="audio/mp3")
 
-    # Plot uploaded noisy waveform
-    fs1, noisy = wavfile.read(noisy_path)
-    if noisy.dtype != np.float32:
-        noisy = noisy.astype(np.float32) / np.iinfo(noisy.dtype).max
-
-    st.audio(noisy_path, format="audio/wav")
+    # Plot noisy waveform
+    noisy, sr = load_mp3(noisy_path)
     fig1, ax1 = plt.subplots(figsize=(8, 2))
     ax1.plot(noisy, color="red")
     ax1.set_title("Noisy Signal Waveform")
@@ -49,21 +52,17 @@ if uploaded_file is not None:
     st.pyplot(fig1)
 
     # -----------------------------
-    # 🧠 Match Output File
+    # 🧠 Match output clean file
     # -----------------------------
-    file_name = uploaded_file.name.lower()
+    filename = uploaded_file.name.lower()
 
-    if file_name in file_map:
-        clean_path = file_map[file_name]
-
+    if filename in file_map:
+        clean_path = file_map[filename]
         if os.path.exists(clean_path):
             st.subheader("🎶 Cleaned Output")
-            fs2, clean = wavfile.read(clean_path)
-            if clean.dtype != np.float32:
-                clean = clean.astype(np.float32) / np.iinfo(clean.dtype).max
+            st.audio(clean_path, format="audio/mp3")
 
-            st.audio(clean_path, format="audio/wav")
-
+            clean, sr2 = load_mp3(clean_path)
             fig2, ax2 = plt.subplots(figsize=(8, 2))
             ax2.plot(clean, color="green")
             ax2.set_title("Cleaned Signal Waveform")
@@ -71,11 +70,15 @@ if uploaded_file is not None:
             ax2.set_ylabel("Amplitude")
             st.pyplot(fig2)
 
+            # Optional: Show improvement metric
+            snr_noisy = np.mean(noisy**2) / (np.mean((noisy - np.mean(noisy))**2) + 1e-8)
+            snr_clean = np.mean(clean**2) / (np.mean((clean - np.mean(clean))**2) + 1e-8)
+            st.info(f"🔢 Estimated Improvement: SNR {10*np.log10(snr_clean/snr_noisy):.2f} dB")
+
             st.success("✨ Noise cancellation successful!")
         else:
-            st.error(f"⚠️ Output file not found for {file_name}")
+            st.error(f"⚠️ Cleaned file '{clean_path}' not found in folder.")
     else:
-        st.warning("❌ No matching clean file found for this input. Please upload a valid noisy file name (e.g. noise1.wav, noise2.wav).")
-
+        st.warning("❌ No matching clean file found. Upload must be named like 'noise1.mp3', 'noise2.mp3', etc.")
 else:
-    st.info("⬆️ Upload a noisy audio file to begin.")
+    st.info("⬆️ Upload a noisy MP3 file to start.")
